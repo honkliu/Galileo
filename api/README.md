@@ -15,3 +15,8 @@ docker run -d --name api-server \
   --link sql-server \
   -p 5000:80 \
   my-api-final
+
+
+# Run in local docker in 80 and expose 5000 to external. 
+# Make sure /api_app include all the source file just like in source code
+docker run -d --name api -p 5000:80 -v /mnt/nvme_raid0/Galileo/api_app:/app -w /app --link sqldb mcr.microsoft.com/dotnet/sdk:7.0 dotnet run --urls "http://*:80"
