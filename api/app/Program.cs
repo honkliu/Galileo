@@ -1,7 +1,25 @@
 using Microsoft.Data.SqlClient;
+using Dapper;
+using System.Collections.Generic;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Add CORS policy
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowAll", builder =>
+    {
+        builder
+            .AllowAnyOrigin()
+            .AllowAnyMethod()
+            .AllowAnyHeader();
+    });
+});
+
 var app = builder.Build();
+
+// Use CORS
+app.UseCors("AllowAll");
 
 // Get config
 var config = new ConfigurationBuilder()
@@ -10,26 +28,44 @@ var config = new ConfigurationBuilder()
     .Build();
 
 app.MapGet("/products", async () => {
-    var connStr = config.GetConnectionString("Default");
-    Console.WriteLine($"Using connection string: {connStr}");
-    
-    using var conn = new SqlConnection(connStr);
-    await conn.OpenAsync();
-    
-    using var cmd = new SqlCommand("SELECT ProductID AS Id, ProductName AS Name, Price FROM Products", conn);
-    using var reader = await cmd.ExecuteReaderAsync();
-    
-    var products = new List<Product>();
-    while (await reader.ReadAsync()) 
+    try
     {
-        products.Add(new Product(
-            reader.GetInt32(0),
-            reader.GetString(1),
-            reader.GetDecimal(2)
-        ));
+        var connStr = config.GetConnectionString("Default");
+        Console.WriteLine($"Using connection string: {connStr}");
+        
+        using var conn = new SqlConnection(connStr);
+        await conn.OpenAsync();
+        
+        var products = await conn.QueryAsync<Product>(
+            "SELECT ProductID AS Id, ProductName AS Name, Price FROM Products");
+        
+        return Results.Ok(products);
     }
-    
-    return products;
+    catch (Exception ex)
+    {
+        Console.WriteLine($"Error in /products: {ex.Message}");
+        return Results.Problem($"Error retrieving products: {ex.Message}");
+    }
+});
+
+app.MapGet("/flights", async () =>
+{
+    try
+    {
+        var connStr = config.GetConnectionString("Default");
+        Console.WriteLine($"Using connection string: {connStr}");
+
+        using var conn = new SqlConnection(connStr);
+        await conn.OpenAsync();
+
+        var flights = await conn.QueryAsync("SELECT * FROM Flight");
+        return Results.Ok(flights);
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"Error in /flights: {ex.Message}");
+        return Results.Problem($"Error retrieving flights: {ex.Message}");
+    }
 });
 
 app.Run();
